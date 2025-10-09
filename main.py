@@ -103,4 +103,4 @@ async def predict(data: Question):
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     # Chạy Uvicorn server, trỏ đến đối tượng ứng dụng app_fastapi trong module main
-    uvicorn.run("main:app_fastapi", host="127.0.0.1", port=port, log_level="info", reload=True)
+    uvicorn.run("main:app_fastapi", host="0.0.0.0", port=port, log_level="info", reload=True)
