@@ -23,7 +23,7 @@ def handle_command(cmd, session):
 if __name__ == "__main__":
     session = "pdf_reader_session"
     print("=" * 60)
-    print("🤖 Chatbot Luật Lao động Việt Nam")
+    print("Chatbot Luật Lao động Việt Nam")
     print("=" * 60)
     # print(f"Tài liệu: {PDF_PATH}")
     # print(f"VectorDB: {VECTORDB_PATH}\n")
