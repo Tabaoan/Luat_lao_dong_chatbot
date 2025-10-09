@@ -27,10 +27,11 @@ app_fastapi = FastAPI(
     version="1.0.0"
 )
 
-
+# 🔹 Cấu hình CORS Middleware
+# Cho phép tất cả các domain (origins=["*"]) hoặc domain cụ thể.
 origins = [
-    "*", 
-    
+    "*", # Cho phép tất 허domain gọi API này
+    # "https://chatbotlaodong.vn", # Nếu bạn chỉ muốn cho phép domain cụ thể
 ]
 
 app_fastapi.add_middleware(
@@ -49,13 +50,14 @@ async def home():
     """Route kiểm tra xem API có hoạt động không."""
     return {
         "message": "✅ Chatbot Luật Lao động API đang hoạt động.",
-        "usage": "Gửi POST tới /predict với JSON { 'question': 'Câu hỏi của bạn' }"
+        "usage": "Gửi POST tới /chat với JSON { 'question': 'Câu hỏi của bạn' }"
     }
 
 # ---------------------------------------
-# 3️⃣ Route chính: /predict (POST)
+# 3️⃣ Route chính: /chat (POST)
 # ---------------------------------------
-@app_fastapi.post("/predict", summary="Dự đoán/Trả lời câu hỏi từ Chatbot")
+# Đã đổi từ /predict sang /chat để khớp với client
+@app_fastapi.post("/chat", summary="Dự đoán/Trả lời câu hỏi từ Chatbot")
 async def predict(data: Question):
     """
     Nhận câu hỏi và trả về câu trả lời từ mô hình chatbot.
@@ -70,7 +72,8 @@ async def predict(data: Question):
         # ✅ Gọi chatbot thực tế nếu có (Giả định app.py có chứa đối tượng chatbot)
         if hasattr(app, "chatbot"):
             session = "api_session" # ID session cố định cho API call
-
+            
+       
             response = await app.chatbot.invoke(
                 {"message": question},
                 config={"configurable": {"session_id": session}}
@@ -102,5 +105,5 @@ async def predict(data: Question):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    # Chạy Uvicorn server, trỏ đến đối tượng ứng dụng app_fastapi trong module main
+    # Dùng "0.0.0.0" là tốt nhất cho cả local và deployment (để Render hoạt động)
     uvicorn.run("main:app_fastapi", host="0.0.0.0", port=port, log_level="info", reload=True)
