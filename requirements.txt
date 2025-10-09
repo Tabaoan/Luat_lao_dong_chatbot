@@ -8,4 +8,4 @@ langchain-chroma==0.2.6
 pypdf==5.1.0
 Flask==3.1.2
 flask-cors == 6.0.1
-fastapi == .118.0
+fastapi == 0.118.0
