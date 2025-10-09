@@ -4,12 +4,16 @@ from pydantic import BaseModel
 import os
 import uvicorn
 from typing import Optional, Any
+# Import thư viện cần thiết cho việc chạy hàm đồng bộ (nếu chatbot là đồng bộ)
+from starlette.concurrency import run_in_threadpool 
 
-
+# ✅ Import chatbot gốc (đổi lại nếu file của bạn không tên là app.py)
+# Thường các framework chatbot như LangChain/LangGraph được import và sử dụng ở đây
 try:
     import app
 except ImportError:
     app = None
+    print("WARNING: Could not import 'app' module. Using mock response.")
 
 # --- Khai báo Model cho dữ liệu đầu vào ---
 # FastAPI sử dụng Pydantic để định nghĩa cấu trúc dữ liệu
@@ -69,40 +73,55 @@ async def predict(data: Question):
         raise HTTPException(status_code=400, detail="Thiếu trường 'question' trong JSON hoặc câu hỏi bị rỗng.")
 
     try:
+        answer = None
+        
         # ✅ Gọi chatbot thực tế nếu có (Giả định app.py có chứa đối tượng chatbot)
         if hasattr(app, "chatbot"):
             session = "api_session" # ID session cố định cho API call
             
-       
-            response = await app.chatbot.invoke(
-                {"message": question},
-                config={"configurable": {"session_id": session}}
-            )
+            # Kiểm tra xem app.chatbot.invoke có phải là hàm bất đồng bộ (coroutine) không
+            if hasattr(app.chatbot.invoke, '__code__') and app.chatbot.invoke.__code__.co_flags & 0x80:
+                # Nếu là async (bất đồng bộ), dùng await trực tiếp
+                response = await app.chatbot.invoke(
+                    {"message": question},
+                    config={"configurable": {"session_id": session}}
+                )
+            else:
+                # Nếu là sync (đồng bộ), chạy nó trong thread pool để không chặn server chính
+                response = await run_in_threadpool(
+                    app.chatbot.invoke,
+                    {"message": question},
+                    config={"configurable": {"session_id": session}}
+                )
             
-            # Giả định response là một dict hoặc object có thể lấy ra text (ví dụ LangChain/LangGraph)
-            # Bạn cần điều chỉnh cách lấy response thực tế tùy thuộc vào framework chatbot
+            # Xử lý kết quả trả về
             if isinstance(response, dict) and 'output' in response:
                  answer = response['output']
             elif isinstance(response, str):
                  answer = response
             else:
-                 # Trường hợp không rõ format, dùng repr() để hiển thị
                  answer = f"Lỗi: Chatbot trả về định dạng không mong muốn: {repr(response)}"
 
 
         else:
-            # Nếu chưa có chatbot thật, trả về giả lập
-            answer = f"(Chatbot mô phỏng) Bạn hỏi: '{question}'"
+            # Nếu chưa có chatbot thật hoặc import thất bại, trả về giả lập
+            answer = f"(Chatbot mô phỏng - LỖI BACKEND: Không tìm thấy đối tượng app.chatbot) Bạn hỏi: '{question}'"
 
         return {"answer": answer}
 
     except Exception as e:
         # Trả về lỗi server 500 nếu có lỗi xảy ra trong quá trình gọi chatbot
-        print(f"Lỗi trong quá trình gọi chatbot: {e}")
-        raise HTTPException(status_code=500, detail=f"Lỗi server: {str(e)}")
+        # Lỗi này RẤT QUAN TRỌNG: nó là lỗi từ logic/kết nối của chatbot
+        print(f"LỖI CHATBOT: {e}")
+        # Ghi log chi tiết (ví dụ: nếu do thiếu API key, lỗi sẽ nằm ở đây)
+        raise HTTPException(status_code=500, detail=f"Lỗi xử lý Chatbot: {str(e)}. Vui lòng kiểm tra log backend của bạn.")
 
 
-
+# ---------------------------------------
+# 4️⃣ Khởi động server Uvicorn (FastAPI)
+# ---------------------------------------
+# KHÔNG CẦN đoạn này khi deploy lên Render/Gunicorn/uvicorn (họ sẽ chạy lệnh: uvicorn main:app_fastapi --host 0.0.0.0 --port $PORT)
+# Tuy nhiên, giữ lại để dễ dàng chạy local
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     # Dùng "0.0.0.0" là tốt nhất cho cả local và deployment (để Render hoạt động)
