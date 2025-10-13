@@ -260,9 +260,9 @@ Hãy trả lời câu hỏi dựa trên nội dung tài liệu trên."""
         response = llm.invoke(messages).content
         
         # Thêm thông tin nguồn
-        source_info = f"\n\n_Nguồn: {os.path.basename(PDF_PATH)}_"
+        #source_info = f"\n\n_Nguồn: {os.path.basename(PDF_PATH)}_"
         
-        return response + source_info
+        return response #+ source_info
         
     except Exception as e:
         return f"Xin lỗi, tôi gặp lỗi khi xử lý câu hỏi: {str(e)}"
