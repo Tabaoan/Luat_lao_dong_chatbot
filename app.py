@@ -38,7 +38,8 @@ vectordb = None
 retriever = None
 
 # ===================== PDF FOLDER =====================
-PDF_FOLDER = r"C:\Users\tabao\Downloads\Luat_lao_dong_chatbot\data"
+PDF_FOLDER = "./data"
+
 
 def get_pdf_files_from_folder(folder_path: str) -> List[str]:
     """Lấy tất cả file PDF trong folder"""
