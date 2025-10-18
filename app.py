@@ -13,7 +13,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.documents import Document
 from langchain_chroma import Chroma
-from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage
+from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage, AIMessage # Import AIMessage
 from langchain_community.document_loaders import PyMuPDFLoader
 
 # ===================== ENV =====================
@@ -29,7 +29,7 @@ llm = ChatOpenAI(
 )
 
 # ===================== VECTORDB =====================
-VECTORDB_PATH = r"./vectordb_storage"
+VECTORDB_PATH = r"./vectordb_storage_1"
 os.makedirs(VECTORDB_PATH, exist_ok=True)
 
 emb = OpenAIEmbeddings(api_key=OPENAI__API_KEY, model=OPENAI__EMBEDDING_MODEL)
@@ -59,33 +59,60 @@ PDF_PATHS = get_pdf_files_from_folder(PDF_FOLDER)
 
 # ===================== SYSTEM PROMPT =====================
 PDF_READER_SYS = (
-    "Bạn là một **trợ lý AI pháp lý** chuyên đọc hiểu và tra cứu các tài liệu PDF đã được cung cấp "
-    "(bao gồm: Luật, Nghị định, Quyết định, Thông tư, Văn bản hợp nhất, v.v.). "
-    "Nhiệm vụ của bạn là **chỉ trả lời các câu hỏi có nội dung liên quan trực tiếp** đến pháp luật Việt Nam, "
-    "đặc biệt là lĩnh vực **Lao động** và **Dân sự**.\n\n"
-    
+    "Bạn là một **trợ lý AI pháp lý** chuyên đọc hiểu và tra cứu các tài liệu PDF được cung cấp "
+    "(bao gồm: Luật, Nghị định, Quyết định, Thông tư, Văn bản hợp nhất, Quy hoạch, Danh mục khu công nghiệp, v.v.). "
+    "Nhiệm vụ của bạn là **trích xuất và trả lời chính xác các thông tin có trong tài liệu**, "
+    "đặc biệt liên quan đến **Lao động**, **Dân sự** và **các Khu công nghiệp, Cụm công nghiệp tại Việt Nam**.\n\n"
+
     "⚙️ **QUY TẮC ĐẶC BIỆT:**\n"
-    "- Nếu người dùng chỉ chào hỏi hoặc đặt câu hỏi chung chung (ví dụ: 'xin chào', 'bạn làm được gì', 'giúp tôi với', ...), "
+    "- Nếu người dùng chỉ chào hỏi hoặc đặt câu hỏi chung chung (ví dụ: 'xin chào', 'bạn làm được gì', 'giúp tôi với' ...), "
     "hãy trả lời **nguyên văn** như sau:\n"
     "'Xin chào! Mình là Chatbot Cổng việc làm Việt Nam. Mình có thể giúp anh/chị tra cứu và giải thích các quy định pháp luật "
     "(luật, nghị định, thông tư...) liên quan đến lao động, việc làm, dân sự và các lĩnh vực pháp lý khác. "
     "Gõ câu hỏi cụ thể hoặc mô tả tình huống nhé — mình sẽ trả lời ngắn gọn, có dẫn nguồn.'\n\n"
-    
-    "📘 **NGUYÊN TẮC TRẢ LỜI:**\n"
-    "1) **Phạm vi:** Chỉ dựa vào nội dung trong các tài liệu PDF đã được cung cấp; không sử dụng hoặc suy diễn kiến thức bên ngoài.\n"
-    "2) **Nguồn trích dẫn:** Khi trả lời, nên dẫn nguồn cụ thể (ví dụ: 'Theo Điều X, Nghị định số Y/NĐ-CP...').\n"
-    "3) **Ngôn ngữ:** Viết theo phong cách pháp lý, rõ ràng, trung lập và tôn trọng văn phong hành chính.\n"
-    "4) **Trình bày:** Ưu tiên liệt kê bằng gạch đầu dòng (-) hoặc số thứ tự (1., 2., 3...) để người đọc dễ theo dõi.\n"
-    "5) **Nếu thông tin không có:** Trả lời rõ ràng: 'Thông tin này không có trong tài liệu được cung cấp.'\n"
-    "6) **Nếu câu hỏi mơ hồ:** Yêu cầu người dùng làm rõ hoặc bổ sung chi tiết để trả lời chính xác.\n\n"
-    
-    "🧩 **VÍ DỤ TRẢ LỜI:**\n"
-    "Theo quy định tại *Điều X* của *Bộ luật Lao động 2019* hoặc *Bộ luật Dân sự 2015*:\n"
-    "- (1) Trích dẫn hoặc tóm tắt nội dung chính của điều luật.\n"
-    "- (2) Diễn giải ý nghĩa hoặc phạm vi áp dụng.\n"
-    "- (3) Nếu có thể, hướng dẫn cách áp dụng trong thực tế.\n"
-)
 
+    "📘 **NGUYÊN TẮC CHUNG KHI TRẢ LỜI:**\n"
+    "1) **Phạm vi:** Chỉ dựa vào nội dung trong các tài liệu PDF đã được cung cấp; tuyệt đối không sử dụng hoặc suy diễn kiến thức bên ngoài.\n"
+    "2) **Nguồn trích dẫn:** Khi có thể, bắt buộc phải ghi rõ nguồn dựa Theo Điều X, Nghị định số Y/NĐ-CP...).\n"
+    "3) **Ngôn ngữ:** Sử dụng văn phong pháp lý, trung lập, rõ ràng và tôn trọng ngữ điệu hành chính.\n"
+    "4) **Trình bày:** Ưu tiên trình bày dưới dạng danh sách (số thứ tự hoặc gạch đầu dòng) để dễ theo dõi.\n"
+    "5) **Nếu thông tin không có:** Trả lời rõ ràng: 'Thông tin này không có trong tài liệu được cung cấp.'\n"
+    "6) **Nếu câu hỏi mơ hồ:** Yêu cầu người dùng làm rõ hoặc bổ sung chi tiết để trả lời chính xác hơn.\n\n"
+
+    "🏭 **QUY ĐỊNH RIÊNG ĐỐI VỚI CÁC KHU CÔNG NGHIỆP / CỤM CÔNG NGHIỆP:**\n"
+    "1) Nếu người dùng hỏi **'Tỉnh/thành phố nào có bao nhiêu khu hoặc cụm công nghiệp'**, "
+    "hãy trả lời theo **định dạng sau**:\n"
+    "   - Số lượng khu/cụm công nghiệp trong tỉnh hoặc thành phố đó.\n"
+    "   - Danh sách tên của tất cả các khu/cụm .\n\n"
+    "   Ví dụ:\n"
+    "   'Tỉnh Bình Dương có 29 khu công nghiệp. Bao gồm:\n"
+    "   - Khu công nghiệp Sóng Thần 1\n"
+    "   - Khu công nghiệp VSIP 1\n"
+    "   - Khu công nghiệp Mỹ Phước 3\n"
+    "   ...'\n\n"
+
+    "2) Nếu người dùng hỏi **chi tiết về một khu/cụm công nghiệp cụ thể (lần đầu tiên)**, hãy trình bày đầy đủ thông tin (nếu có trong tài liệu), gồm:\n"
+    "   - Tên khu công nghiệp / cụm công nghiệp\n"
+    "   - Địa điểm (tỉnh/thành phố, huyện/thị xã)\n"
+    "   - Diện tích (ha hoặc m²)\n"
+    "   - Cơ quan quản lý / chủ đầu tư\n"
+    "   - Quyết định thành lập hoặc phê duyệt quy hoạch\n"
+    "   - Ngành nghề hoạt động chính\n"
+    "   - Tình trạng hoạt động (đang hoạt động / đang quy hoạch / đang xây dựng)\n"
+    "   - Các thông tin khác liên quan (nếu có)\n\n"
+
+    "3) Nếu người dùng **tiếp tục hỏi chi tiết** về các cụm hoặc khu công nghiệp (từ lần thứ hai trở đi), "
+    "hãy **không liệt kê lại thông tin chi tiết**, mà **trả lời cố định** như sau:\n"
+    "'Nếu bạn muốn biết thêm thông tin chi tiết về các cụm, hãy truy cập vào website https://iipmap.com/.'\n\n"
+
+    "4) Nếu người dùng chỉ hỏi thống kê (ví dụ: 'Tỉnh Bắc Ninh có bao nhiêu cụm công nghiệp?'), "
+    "hãy luôn trả lời số lượng và liệt kê tên cụm/khu theo quy định tại mục (1) ở trên.\n\n"
+
+    "5) Nếu người dùng hỏi **câu ngoài phạm vi pháp luật hoặc khu/cụm công nghiệp** "
+    "(ví dụ: hỏi về tuyển dụng, giá đất, đầu tư cá nhân, v.v.), "
+    "hãy trả lời nguyên văn như sau:\n"
+    "'Anh/chị vui lòng để lại tên và số điện thoại, chuyên gia của IIP sẽ liên hệ và giải đáp các yêu cầu của anh/chị ạ.'\n\n"
+)
 
 # ===================== VECTORDB UTILS =====================
 def build_context_from_hits(hits, max_chars: int = 6000) -> str:
@@ -223,7 +250,7 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
     existing_sources = get_existing_sources()
     print(f"📊 VectorDB hiện có: {len(existing_sources)} file")
     if existing_sources:
-        print(f"   └─ {', '.join(sorted(existing_sources))}")
+        print(f"   └─ {', '.join(sorted(existing_sources))}")
     
     # Xác định file cần nạp mới
     target_files = {os.path.basename(p): p for p in pdf_paths}
@@ -232,12 +259,12 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
     if not new_files:
         print(f"\n✅ Tất cả {len(target_files)} file đã có trong VectorDB!")
         print("💡 Dùng lệnh 'reload' để nạp lại toàn bộ nếu cần.\n")
-        retriever = vectordb.as_retriever(search_kwargs={"k": 10})
+        retriever = vectordb.as_retriever(search_kwargs={"k": 50})
         return vectordb
     
     print(f"\n📥 Cần nạp {len(new_files)} file mới:")
     for name in sorted(new_files.keys()):
-        print(f"   + {name}")
+        print(f"   + {name}")
     print()
 
     all_new_docs = []
@@ -267,8 +294,8 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
 
         # Chunk nội dung
         splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
+            chunk_size=500,
+            chunk_overlap=300,
             separators=["\n\n", "\n", ". ", " ", ""]
         )
         split_docs = splitter.split_documents(docs)
@@ -277,13 +304,13 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
         for i, d in enumerate(split_docs):
             d.metadata["chunk_id"] = i
 
-        print(f"   🔹 Tạo {len(split_docs)} đoạn từ {filename}")
+        print(f"   🔹 Tạo {len(split_docs)} đoạn từ {filename}")
         all_new_docs.extend(split_docs)
         total_chunks += len(split_docs)
 
     if not all_new_docs:
         print("⚠️ Không có document mới nào để nạp.")
-        retriever = vectordb.as_retriever(search_kwargs={"k": 10})
+        retriever = vectordb.as_retriever(search_kwargs={"k": 50})
         return vectordb
 
     print(f"\n📚 Tổng cộng: {total_chunks} đoạn nội dung mới\n")
@@ -304,7 +331,7 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
             batch_docs = all_new_docs[i:i+batch_size]
             batch_ids = ids[i:i+batch_size]
             vectordb.add_documents(batch_docs, ids=batch_ids)
-            print(f"   ✓ Đã thêm {min(i+batch_size, len(all_new_docs))}/{len(all_new_docs)} documents")
+            print(f"   ✓ Đã thêm {min(i+batch_size, len(all_new_docs))}/{len(all_new_docs)} documents")
         
         print("✅ Đã thêm toàn bộ documents mới vào VectorDB!")
     except Exception as e:
@@ -312,7 +339,7 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
         return None
 
     # Cập nhật retriever
-    retriever = vectordb.as_retriever(search_kwargs={"k": 10})
+    retriever = vectordb.as_retriever(search_kwargs={"k": 50})
 
     # Thống kê cuối cùng
     try:
@@ -320,9 +347,9 @@ def ingest_pdf(pdf_paths=None, vectordb_path=None, emb_fn=None, force_reload=Fal
         final_sources = get_existing_sources()
         print(f"\n📂 Lưu tại: {vectordb_path}")
         print(f"📊 VectorDB hiện có:")
-        print(f"   • Tổng documents: {count}")
-        print(f"   • Tổng file: {len(final_sources)}")
-        print(f"   • Danh sách: {', '.join(sorted(final_sources))}\n")
+        print(f"   • Tổng documents: {count}")
+        print(f"   • Tổng file: {len(final_sources)}")
+        print(f"   • Danh sách: {', '.join(sorted(final_sources))}\n")
     except Exception as e:
         print(f"⚠️ Không thể lấy thống kê: {e}\n")
 
@@ -338,6 +365,42 @@ def clean_question_remove_uris(text: str) -> str:
     toks = [t for t in toks if not t.lower().endswith(".pdf")]
     return " ".join(toks).strip()
 
+# Chuỗi trả lời cố định theo Quy tắc 3
+FIXED_RESPONSE_Q3 = 'Nếu bạn muốn biết thêm thông tin chi tiết về các cụm, hãy truy cập vào website https://iipmap.com/.'
+
+def is_detail_query(text: str) -> bool:
+    """Kiểm tra xem câu hỏi có phải là câu hỏi chi tiết về khu/cụm công nghiệp hay không"""
+    text_lower = text.lower()
+    keywords = ["nêu chi tiết", "chi tiết về", "thông tin chi tiết", "cụm công nghiệp", "khu công nghiệp"]
+    if any(k in text_lower for k in keywords):
+        # Tránh nhầm lẫn với câu hỏi thống kê
+        if "có bao nhiêu" in text_lower or "thống kê" in text_lower:
+            return False
+        return True
+    return False
+
+def count_previous_detail_queries(history: List[BaseMessage]) -> int:
+    """Đếm số lần hỏi chi tiết về KCN/CCN đã được trả lời trước đó (lần đầu được tính là 0)"""
+    count = 0
+    # Lặp qua lịch sử từ tin nhắn cũ nhất đến tin nhắn gần nhất
+    for i in range(len(history)):
+        current_message = history[i]
+        
+        # Chỉ xét tin nhắn HumanMessage và tin nhắn Bot (AIMessage) liền kề
+        if isinstance(current_message, HumanMessage):
+            # Kiểm tra xem tin nhắn người dùng có phải là câu hỏi chi tiết không
+            is_q = is_detail_query(current_message.content)
+            
+            # Kiểm tra câu trả lời liền kề của Bot
+            if is_q and i + 1 < len(history) and isinstance(history[i+1], AIMessage):
+
+                bot_response = history[i+1].content
+                if FIXED_RESPONSE_Q3 not in bot_response:
+                    count += 1
+
+                
+    return count
+
 def process_pdf_question(i: Dict[str, Any]) -> str:
     """Xử lý câu hỏi từ người dùng"""
     global retriever
@@ -345,6 +408,21 @@ def process_pdf_question(i: Dict[str, Any]) -> str:
     message = i["message"]
     history: List[BaseMessage] = i.get("history", [])
 
+    # ************************************************
+    # BỔ SUNG LOGIC CHO QUY TẮC 3 TẠI ĐÂY
+    # ************************************************
+    clean_question = clean_question_remove_uris(message)
+    
+    if is_detail_query(clean_question):
+        count_detail_queries = count_previous_detail_queries(history)
+
+        if count_detail_queries >= 1: # Lần hỏi chi tiết thứ hai trở đi (đã có 1 lần trả lời thành công)
+            #print(f"💡 Phát hiện hỏi chi tiết lần {count_detail_queries + 1}. Áp dụng Quy tắc 3.")
+            return FIXED_RESPONSE_Q3
+        
+        # Nếu count_detail_queries == 0, đây là lần hỏi chi tiết đầu tiên -> Tiếp tục xử lý bình thường.
+    # ************************************************
+    
     # Kiểm tra VectorDB
     if not check_vectordb_exists():
         print("⚠️ VectorDB chưa sẵn sàng, đang nạp PDF vào hệ thống...")
@@ -352,7 +430,6 @@ def process_pdf_question(i: Dict[str, Any]) -> str:
         if result is None:
             return "Xin lỗi, tôi gặp lỗi khi nạp tài liệu PDF. Vui lòng kiểm tra lại đường dẫn file."
 
-    clean_question = clean_question_remove_uris(message)
     
     try:
         # Tìm kiếm trong VectorDB
@@ -381,6 +458,13 @@ Hãy trả lời dựa trên các nội dung trên."""
         
         # Gọi LLM
         response = llm.invoke(messages).content
+        
+        # ************************************************
+        # PHẢI LƯU TRỮ LẠI CÂU TRẢ LỜI ĐỂ CÓ THỂ ĐẾM ĐÚNG
+        # Trong cấu trúc LangChain RunnableWithMessageHistory, việc lưu trữ diễn ra sau hàm này.
+        # Logic đếm ở trên là đủ để chặn.
+        # ************************************************
+        
         return response
 
     except Exception as e:
@@ -409,12 +493,12 @@ def print_help():
     print("\n" + "="*60)
     print("📚 CÁC LỆNH CÓ SẴN:")
     print("="*60)
-    print(" - exit / quit  : Thoát chương trình")
-    print(" - clear        : Xóa lịch sử hội thoại")
-    print(" - sync         : Đồng bộ file mới từ folder vào VectorDB")
-    print(" - reload       : Xóa toàn bộ và nạp lại (force reload)")
-    print(" - status       : Kiểm tra trạng thái VectorDB")
-    print(" - help         : Hiển thị hướng dẫn này")
+    print(" - exit / quit  : Thoát chương trình")
+    print(" - clear        : Xóa lịch sử hội thoại")
+    print(" - sync         : Đồng bộ file mới từ folder vào VectorDB")
+    print(" - reload       : Xóa toàn bộ và nạp lại (force reload)")
+    print(" - status       : Kiểm tra trạng thái VectorDB")
+    print(" - help         : Hiển thị hướng dẫn này")
     print("="*60 + "\n")
 
 def handle_command(command: str, session: str) -> bool:
@@ -448,7 +532,7 @@ def handle_command(command: str, session: str) -> bool:
             print(f"📂 Đường dẫn: {stats['path']}")
             print(f"📘 Các file đã nạp:")
             for src in stats.get('sources', []):
-                print(f"   - {src}")
+                print(f"   - {src}")
         else:
             print("❌ Trạng thái: Chưa sẵn sàng")
             print("💡 Hãy đợi hệ thống nạp PDF hoặc gõ 'reload'")
@@ -475,9 +559,9 @@ if __name__ == "__main__":
     if PDF_PATHS:
         for idx, p in enumerate(PDF_PATHS, 1):
             status = "✅" if os.path.exists(p) else "❌"
-            print(f"   {idx}. {status} {os.path.basename(p)}")
+            print(f"   {idx}. {status} {os.path.basename(p)}")
     else:
-        print("   ⚠️ Không tìm thấy file PDF nào trong folder!")
+        print("   ⚠️ Không tìm thấy file PDF nào trong folder!")
     
     print(f"\n📂 VectorDB: {VECTORDB_PATH}")
     print("🔍 Tôi hỗ trợ: Luật Lao động & Luật Dân sự Việt Nam")
