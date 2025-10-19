@@ -7,8 +7,6 @@ from typing import Optional, Any
 # Import thư viện cần thiết cho việc chạy hàm đồng bộ (nếu chatbot là đồng bộ)
 from starlette.concurrency import run_in_threadpool 
 
-# ✅ Import chatbot gốc (đổi lại nếu file của bạn không tên là app.py)
-# Thường các framework chatbot như LangChain/LangGraph được import và sử dụng ở đây
 try:
     import app
 except ImportError:
